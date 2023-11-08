@@ -12,9 +12,6 @@ import (
 	"testing"
 )
 
-func TestHello(t *testing.T) {
-
-}
 
 func TestServer_RegistAccount(t *testing.T) {
 	type mockFields struct {
@@ -31,10 +28,12 @@ func TestServer_RegistAccount(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	rec2 := httptest.NewRecorder()
+	rec3 := httptest.NewRecorder()
+	rec4 := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c2 := e.NewContext(req, rec2)
 	mockWantSuccess := `{"id":1}`
 	mockWantError := `{"message":"assert.AnError general error for testing"}`
+	mockWantErrorPhoneNumberAlreadyExists := `{"message":"phone number already registered"}`
 
 	tests := []struct {
 		name         string
@@ -46,8 +45,49 @@ func TestServer_RegistAccount(t *testing.T) {
 		wantErr      error
 	}{
 		{
+			name: "when failed on get user by phone, then return error",
+			mock: func(mocks mockFields) {
+				mocks.repository.EXPECT().GetUserByPhoneNumber(context.Background(), "+628123123123").Return(repository.Account{}, assert.AnError)
+			},
+			args: args{
+				ctx: e.NewContext(req, rec3),
+				params: RegistrationParams{
+					FullName:    "test full name",
+					PhoneNumber: "+628123123123",
+					Password:    "dfjajh23D!",
+				},
+			},
+			rec:          rec3,
+			want:         mockWantError,
+			wantHTTPCode: http.StatusInternalServerError,
+			wantErr:      nil,
+		},
+		{
+			name: "when failed on phone number already exists, then return error",
+			mock: func(mocks mockFields) {
+				mocks.repository.EXPECT().GetUserByPhoneNumber(context.Background(), "+628123123123").Return(repository.Account{
+					ID:          1,
+					FullName:    "test user",
+					PhoneNumber: "+628123123123",
+				}, nil)
+			},
+			args: args{
+				ctx: e.NewContext(req, rec4),
+				params: RegistrationParams{
+					FullName:    "test full name",
+					PhoneNumber: "+628123123123",
+					Password:    "dfjajh23D!",
+				},
+			},
+			rec:          rec4,
+			want:         mockWantErrorPhoneNumberAlreadyExists,
+			wantHTTPCode: http.StatusConflict,
+			wantErr:      nil,
+		},
+		{
 			name: "when success on insert account, then return empty error",
 			mock: func(mocks mockFields) {
+				mocks.repository.EXPECT().GetUserByPhoneNumber(context.Background(), "+628123123123").Return(repository.Account{}, nil)
 				mocks.repository.EXPECT().InsertAccount(context.Background(), gomock.AssignableToTypeOf(repository.Account{})).DoAndReturn(func(ctx context.Context, params repository.Account) (int64, error) {
 					assert.Equal(t, "test full name", params.FullName)
 					assert.Equal(t, "+628123123123", params.PhoneNumber)
@@ -70,6 +110,7 @@ func TestServer_RegistAccount(t *testing.T) {
 		{
 			name: "when failed on insert account, then return error",
 			mock: func(mocks mockFields) {
+				mocks.repository.EXPECT().GetUserByPhoneNumber(context.Background(), "+628123123123").Return(repository.Account{}, nil)
 				mocks.repository.EXPECT().InsertAccount(context.Background(), gomock.AssignableToTypeOf(repository.Account{})).DoAndReturn(func(ctx context.Context, params repository.Account) (int64, error) {
 					assert.Equal(t, "test full name", params.FullName)
 					assert.Equal(t, "+628123123123", params.PhoneNumber)
@@ -77,7 +118,7 @@ func TestServer_RegistAccount(t *testing.T) {
 				})
 			},
 			args: args{
-				ctx: c2,
+				ctx:  e.NewContext(req, rec2),
 				params: RegistrationParams{
 					FullName:    "test full name",
 					PhoneNumber: "+628123123123",
