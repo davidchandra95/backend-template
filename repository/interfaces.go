@@ -11,6 +11,6 @@ type RepositoryInterface interface {
 	InsertAccount(ctx context.Context, input Account) (int64, error)
 	InsertLoginLog(ctx context.Context, accountID int64) (int64, error)
 	GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (Account, error)
-	GetUserByID(ctx context.Context, id string) (Account, error)
+	GetUserByID(ctx context.Context, id int64) (Account, error)
 	UpdateAccount(ctx context.Context, updatedAccount Account) error
 }
